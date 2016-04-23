@@ -1,0 +1,22 @@
+mydata = read.csv("/media/pragati/New Volume/ssrivas6/MLProject/Output.csv", sep="|")
+mydata=unique(mydata)
+mynames=c("Restaurant", "RestaurantID", "AvgRating","AuthorName","Id","NumberOfFriends", "NumberOfReviews","Rating", "Review", "Date", "Class")
+names(mydata)=mynames
+fakedata = read.csv("/media/pragati/New Volume/ssrivas6/MLProject/OutputBR.csv", sep="|")
+names(fakedata)=mynames
+fakedata=unique(fakedata)
+uni = as.character(unique(fakedata$RestaurantID))
+for(i in uni){
+  indx=which(mydata$RestaurantID==i)[1]
+  res.name=as.character(mydata$Restaurant[indx])
+  res.rating=as.numeric(mydata$AvgRating[indx])
+  indexes=which(fakedata$RestaurantID==i)
+  for(x in indexes){
+    fakedata$Restaurant[x]=res.name
+    fakedata$AvgRating[x]=res.rating
+  }                       
+}
+mydata=rbind(mydata,fakedata)
+mydata=unique(mydata)
+#mydata$Date=regmatches(mydata$Date,gregexpr("\\d{1,2}/\\d{1,2}/\\d{4}",mydata$Date,perl=TRUE))   
+mydata= mydata[!grepl("This review has been removed for violating our Terms of Service", mydata$Review),]

@@ -1,0 +1,104 @@
+mydata = read.csv("/Data/Output.csv", sep="|")
+mydata=unique(mydata)
+mynames=c("Restaurant", "RestaurantID", "AvgRating","AuthorName","Id","NumberOfFriends", "NumberOfReviews","Rating", "Review", "Date", "Class")
+names(mydata)=mynames
+
+#Packages:
+#Needed <- c("tm", "SnowballCC", "RColorBrewer", "ggplot2", "wordcloud", "biclust", "cluster", "igraph", "fpc")   
+#install.packages(Needed, dependencies=TRUE)   
+#install.packages("gtools", dependencies = T)
+
+
+#Text Mining:
+#review_text <- paste(mydata$Review, collapse=" ")
+#review_source <- VectorSource(review_text)
+#corpus <- Corpus(review_source)
+
+library(tm)
+testdata<-mydata[sample(nrow(mydata), size=5000, replace=FALSE),]
+#testdata=subset(testdata, Class == 1)
+tdata = testdata$Review
+tdata = as.data.frame(testdata$Review)
+
+#iconv(tdata, "latin1", "ASCII", sub="")
+
+docs <- Corpus(DataframeSource(tdata))
+#docs[[1]]$content
+
+# remove punctuations
+docs <- tm_map(docs, removePunctuation)   
+
+# remove special characters
+for(j in seq(docs))   
+{   
+  docs[[j]] <- gsub("/", " ", docs[[j]])   
+  docs[[j]] <- gsub("@", " ", docs[[j]])   
+  docs[[j]] <- gsub("\\|", " ", docs[[j]])
+  docs[[j]] <- gsub("#", " ", docs[[j]])
+  docs[[j]] <- gsub("&", " ", docs[[j]])
+  docs[[j]] <- gsub("$", " ", docs[[j]])
+}    
+# inspect(docs[1])
+
+
+#Removing numbers:
+docs <- tm_map(docs, removeNumbers)  
+
+#Converting to lowercase:
+docs <- tm_map(docs, tolower)
+
+# Removing “stopwords” :
+docs <- tm_map(docs, removeWords, stopwords("english"))
+
+#writings <- tm_map(writings, removeWords, stopwords(“SMART”))
+
+#Removing common word endings (e.g., “ing”, “es”, “s”)
+library(SnowballC) 
+docs <- tm_map(docs, stemDocument)
+
+#Stripping unnecesary whitespace
+docs <- tm_map(docs, stripWhitespace)
+
+#end of the preprocessing
+docs <- tm_map(docs, PlainTextDocument)   
+
+#create a document term matrix
+dtm <- DocumentTermMatrix(docs)
+#inspect(dtm[1:5, 1:20])
+
+#transpose
+tdm <- TermDocumentMatrix(docs)
+
+#Organize terms by their frequency:
+freq <- colSums(as.matrix(dtm))   
+#length(freq) 
+ord <- order(freq) 
+
+# removing sparse terms:   
+dtms <- removeSparseTerms(dtm, 0.1) # This makes a matrix that is 10% empty space, maximum.   
+#inspect(dtms)  
+
+#frequecy
+freq <- colSums(as.matrix(dtm))  
+freq <- sort(colSums(as.matrix(dtm)), decreasing=TRUE)
+#head(freq, 14)
+#tdmnew <- rollup(dtm, 2, na.rm=TRUE, FUN = sum)
+
+wf <- data.frame(word=names(freq), freq=freq)   
+
+freq <- colSums(as.matrix(dtms))  
+freq <- sort(colSums(as.matrix(dtm)), decreasing=TRUE)   
+#head(freq, 14)
+
+#Plot
+library(ggplot2)   
+p <- ggplot(subset(wf, freq>2000), aes(word, freq))    
+p <- p + geom_bar(stat="identity")   
+p <- p + theme(axis.text.x=element_text(angle=45, hjust=1))   
+p
+
+#Cloud Word
+library(wordcloud)
+set.seed(142)   
+dark2 <- brewer.pal(6, "Dark2")   
+wordcloud(names(freq), freq, max.words=100, rot.per=0.2, colors=dark2)  

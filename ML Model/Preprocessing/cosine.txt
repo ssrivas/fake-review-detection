@@ -1,0 +1,54 @@
+#install.packages("lsa", dependencies=TRUE)
+library(lsa)
+
+#author.index = which(testdata$Id == 'nXYFbtjWvBYhxKn5WK1SaQ', arr.ind = TRUE)
+#author.review = docs[author.index]
+#dtmr <- DocumentTermMatrix(author.review)
+
+
+#dtm.m <- as.matrix(dtmr)
+#d <- dist(dtm.m, method = "euclidean")
+#dtm.t <- t(dtm.m)
+#d <- cosine(dtm.t)
+#diag(d) = 0
+#max(d)
+
+
+
+ll = list()
+uni = as.character(unique(unlist(testdata$Id)))
+for(i in seq(1:length(uni))){
+    author = uni[i]
+    author.index = which(testdata$Id == author, arr.ind = TRUE)
+    if(length(author.index) > 1){
+        author.review = docs[author.index]
+        dtmr <- DocumentTermMatrix(author.review)
+        
+        dtm.m <- as.matrix(dtmr)
+        #d <- dist(dtm.m, method = "euclidean")
+        dtm.t <- t(dtm.m)
+        d <- cosine(dtm.t)
+        diag(d) = 0
+        ll=c(ll,max(d))
+    }else{
+        ll=c(ll,0)
+    }
+}
+author.list = mapply(c,uni , ll, SIMPLIFY=FALSE)
+#author.mat = do.call(rbind, author.list)
+
+autcostlist = rep(0,nrow(testdata))
+
+#for(i in seq(1:nrow(author.mat))){
+for(i in uni){
+    #authorid = i
+    #authoridCost = author.mat[i,2]
+    authoridCost=as.numeric(author.list[[i]][2])
+    autcostlist[which(testdata$Id == i, arr.ind = TRUE)]=authoridCost
+}
+
+
+testdata1= cbind(testdata,cost= autcostlist)
+#c=which(testdata1$cost>0, arr.ind = TRUE)
+ind=which(testdata1$cost==1, arr.ind = TRUE)
+max(testdata1$cost[-ind])

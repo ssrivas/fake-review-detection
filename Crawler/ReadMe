@@ -1,0 +1,12 @@
+
+Install requirements
+-------------
+    $ cd yelpcrawl
+    $ pip install -r requirements.txt
+
+To run crawler
+-------------
+
+    $ python crawler2Main.py -z 98029
+
+

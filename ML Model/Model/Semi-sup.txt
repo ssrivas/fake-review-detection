@@ -1,0 +1,47 @@
+
+library(DMwR)
+library(e1071)
+library(caret)
+
+mydata = read.csv("/Data/YelpReviewData.csv")
+data = mydata[c("review_length","abs_dev","MNRcount","cosinecost","Class")]
+##Shuffle data
+data <- data[sample(nrow(data)),]
+#####Divide data into training and test set
+ptrain=0.6
+indices=sample(nrow(data), ptrain*nrow(data), replace = FALSE);
+trdata=data[indices,]
+tsdata=data[-indices,]
+
+#############################################
+trdata <- trdata[sample(nrow(trdata)),]   #Shuffle Training data
+ldata = trdata[1:100,]      #Take first 100 data as labeled
+uldata = trdata[(nrow(trdata)-15000+1):nrow(trdata),]
+uldata$Class = NA
+######################
+
+##Model for labeled data
+model.nb=naiveBayes(Class~., data=ldata)
+pred.nb=data.frame(predict(model.nb, tsdata[,-5], type="raw"))
+pred.nb$label=sapply(1:nrow(pred.nb), function(x) ifelse(pred.nb[x,]$X0>=pred.nb[x,]$X1, 0, 1))
+table.nb=table(pred.nb$label,tsdata$Class)
+confusionMatrix(pred.nb$label,tsdata$Class)
+
+#Combine labeled and ulabled data
+semi.sup.data <- rbind(ldata, uldata)
+
+#Function for self train
+predfunc.nb <- function(m,d) {
+  p <- predict(m,d,type='raw')
+  data.frame(cl=colnames(p)[apply(p,1,which.max)],
+             p=apply(p,1,max)
+             )
+}
+
+#SelfTrain
+nbST <- SelfTrain(Class ~ .,semi.sup.data,learner('naiveBayes',list()),'predfunc.nb')
+pred.nb=data.frame(predict(nbST,tsdata[,-5],type="raw"))
+pred.nb$label=sapply(1:nrow(pred.nb), function(x) ifelse(pred.nb[x,]$X0>=pred.nb[x,]$X1, 0, 1))
+table.nb=table(pred.nb$label,tsdata$Class)
+confusionMatrix(pred.nb$label,tsdata$Class)
+

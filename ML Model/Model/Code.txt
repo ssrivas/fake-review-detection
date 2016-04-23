@@ -1,0 +1,82 @@
+mydata = read.csv("/Data/Output.csv")
+
+library(DMwR)
+library(e1071)
+
+data = mydata[c("review_length","abs_dev","MNRcount","cosinecost","Class")]
+##Shuffle data
+data <- data[sample(nrow(data)),]
+#####Divide data into training and test set
+ptrain=0.6
+indices=sample(nrow(data), ptrain*nrow(data), replace = FALSE);
+trdata=data[indices,]
+tsdata=data[-indices,]
+#############################################
+trdata <- trdata[sample(nrow(trdata)),]
+ldata = trdata[1:50,]
+uldata = trdata[(nrow(trdata)-15000+1):nrow(trdata),]
+uldata$Class = NA
+######################
+#NAIVE BAYES MODEL - Training Data
+model.nb=naiveBayes(Class~., data=trdata)
+pred.nb=data.frame(predict(model.nb, tsdata[,-1], type="raw"))
+pred.nb$label=sapply(1:nrow(pred.nb), function(x) ifelse(pred.nb[x,]$X0>=pred.nb[x,]$X1, 0, 1))
+
+table.nb=table(pred.nb$label,tsdata$Class)
+confusionMatrix(pred.nb$label,tsdata$Class)
+
+
+#########################
+# Taking 50 labeled data
+trdata <- trdata[sample(nrow(trdata)),]
+ldata = trdata[1:50,]
+uldata = trdata[(nrow(trdata)-15001):nrow(trdata),]
+uldata$Class = NA
+
+model.nb=naiveBayes(Class~., data=ldata)
+pred.nb=data.frame(predict(model.nb, tsdata[,-5], type="raw"))
+pred.nb$label=sapply(1:nrow(pred.nb), function(x) ifelse(pred.nb[x,]$X0>=pred.nb[x,]$X1, 0, 1))
+table.nb=table(pred.nb$label,tsdata$Class)
+library(caret)
+confusionMatrix(pred.nb$label,tsdata$Class)
+#########################
+#Taking 50 labled and 15000 unlabled data
+pred.nb=data.frame(predict(model.nb, uldata[,-5], type="raw"))
+pred.nb$label=sapply(1:nrow(pred.nb), function(x) ifelse(pred.nb[x,]$X0>=pred.nb[x,]$X1, 0, 1))
+uldata$Class=pred.nb$label
+semi.sup.data <- rbind(ldata, uldata)
+model.nb.semisup=naiveBayes(Class~., data=semi.sup.data)
+pred.nb=data.frame(predict(model.nb.semisup, tsdata[,-5], type="raw"))
+pred.nb$label=sapply(1:nrow(pred.nb), function(x) ifelse(pred.nb[x,]$X0>=pred.nb[x,]$X1, 0, 1))
+table.nb=table(pred.nb$label,tsdata$Class)
+confusionMatrix(pred.nb$label,tsdata$Class)
+
+
+#####################################
+######################################
+# Taking 50 labeled data
+trdata <- trdata[sample(nrow(trdata)),]
+ldata = trdata[1:50,]
+uldata = trdata[(nrow(trdata)-15000+1):nrow(trdata),]
+uldata$Class = NA
+
+model.nb=naiveBayes(Class~., data=ldata)
+pred.nb=data.frame(predict(model.nb, tsdata[,-5], type="raw"))
+pred.nb$label=sapply(1:nrow(pred.nb), function(x) ifelse(pred.nb[x,]$X0>=pred.nb[x,]$X1, 0, 1))
+table.nb=table(pred.nb$label,tsdata$Class)
+confusionMatrix(pred.nb$label,tsdata$Class)
+
+semi.sup.data <- rbind(ldata, uldata)
+
+predfunc.nb <- function(m,d) {
+  p <- predict(m,d,type='raw')
+  data.frame(cl=colnames(p)[apply(p,1,which.max)],
+             p=apply(p,1,max)
+             )
+}
+
+nbST <- SelfTrain(Class ~ .,semi.sup.data,learner('naiveBayes',list()),'predfunc.nb')
+pred.nb=data.frame(predict(nbST,tsdata[,-5],type="raw"))
+pred.nb$label=sapply(1:nrow(pred.nb), function(x) ifelse(pred.nb[x,]$X0>=pred.nb[x,]$X1, 0, 1))
+table.nb=table(pred.nb$label,tsdata$Class)
+confusionMatrix(pred.nb$label,tsdata$Class)
