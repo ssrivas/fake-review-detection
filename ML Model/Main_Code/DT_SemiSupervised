@@ -1,0 +1,74 @@
+rm(list=ls())
+library(DMwR)
+library(rpart)
+library(caret)
+
+mydata = read.csv("YelpReviewData.csv")
+
+data = mydata[c("review_length","abs_dev","MNRcount","cosinecost","Class")]
+##Shuffle data
+data <- data[sample(nrow(data)),]
+
+#####Divide data into training and test set
+ptrain=0.7
+indices=sample(nrow(data), ptrain*nrow(data), replace = FALSE);
+trdata=data[indices,]
+tsdata=data[-indices,]
+#############################################
+#50,100,150,200,300,500,700,900,1200, 1500, 2000, 2500, 3000
+nldata = c(0,50,150,300,500,800,1200,1900,2800,4000,5500,7500,10500)
+maxldata=10500
+
+resultlist = list()
+for( itr in 1:1){
+  semisupresult = data.frame(SupervisedAcc=double(),SemiSupervisedAcc=double())
+  trdata <- trdata[sample(nrow(trdata)),]   #Shuffle Training data
+  for (i in 2:length(nldata)-1) {
+    ldatalow=nldata[i]+1
+    ldatahigh=nldata[i+1]
+    ldata = trdata[ldatalow:ldatahigh,] 
+    uldata = trdata[(maxldata+1):nrow(trdata),]
+    uldata$Class = NA
+    
+    ##Model for labeled data
+    model.nb=tree(Class~., data=ldata, method = "class")
+    pred.nb=data.frame(predict(model.nb, tsdata[,-5]))
+    pred.nb$label=ifelse(pred.nb>0.8, 1, 0)
+    cmsup = confusionMatrix(pred.nb$label,tsdata$Class)
+    sup.accuracy = cmsup$overall['Accuracy']
+    #Combine labeled and ulabled data
+    semi.sup.data <- rbind(ldata, uldata)
+    
+    #Function for self train
+    predfunc.nb <- function(m,d) {
+      p <- predict(m,d)
+      data.frame(cl="1",
+                 p=p
+      )
+    }
+    
+    #SelfTrain
+    nbST <- SelfTrain(Class ~ .,semi.sup.data,learner('tree',list(method = "class")),'predfunc.nb')
+    
+    pred.nb=data.frame(predict(nbST,tsdata[,-5]))
+    #pred.nb$label=sapply(1:nrow(pred.nb), function(x) ifelse(pred.nb[x,]$X0>=pred.nb[x,]$X1, 0, 1))
+    pred.nb$label=ifelse(pred.nb>0.8, 1, 0)
+    cmunsup = confusionMatrix(pred.nb$label,tsdata$Class)
+    unsup.accuracy = cmunsup$overall['Accuracy']
+    
+    semisupresult[i,]=c(sup.accuracy,unsup.accuracy)
+  }
+  
+  resultlist = c(resultlist,semisupresult)
+}
+
+Labels = c(50,100,150,200,300,500,700,900,1200,1500,2000,2500)
+
+ToPlot = data.frame(Labels,semisupresult$SupervisedAcc,semisupresult$SemiSupervisedAcc)
+
+xrange = range(ToPlot$Labels)
+yrange = range(ToPlot$semisupresult.SupervisedAcc)
+plot(xrange, yrange, type="n", xlab="Number of Labled data",ylab="Accuracy" )
+lines(ToPlot$Labels, ToPlot$semisupresult.SupervisedAcc, type="b", lwd=1.5, lty=1, col="red", pch=18)
+lines(ToPlot$Labels, ToPlot$semisupresult.SemiSupervisedAcc, type="b", lwd=1.5, lty=1, col="blue", pch=18)
+
